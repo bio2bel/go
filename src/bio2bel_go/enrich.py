@@ -7,14 +7,15 @@ from .manager import Manager
 
 __all__ = [
     'to_bel',
-    'enrich_bioprocesses'
+    'enrich_bioprocesses',
+    'upload_bel'
 ]
 
 log = logging.getLogger(__name__)
 
 
 def to_bel(manager=None):
-    """Creates a BEL Graph
+    """Creates a BEL graph from the Gene Ontology
 
     :type manager: Optional[bio2bel_go.Manager]
     """
@@ -23,7 +24,7 @@ def to_bel(manager=None):
 
 
 def enrich_bioprocesses(graph, manager=None):
-    """Enriches a BEL Graph?
+    """Enriches the biological processses in a BEL graph
 
     :type graph: pybel.BELGraph
     :type manager: Optional[bio2bel_go.Manager]
@@ -33,7 +34,7 @@ def enrich_bioprocesses(graph, manager=None):
 
 
 def upload_bel(manager=None, pybel_manager=None):
-    """Uploads BEL to PyBEL edge store
+    """Creates a BEL graph from the Gene Ontology and uplopads it to the PyBEL edge store
 
     :type manager: Optional[bio2bel_go.Manager]
     :type pybel_manager: Optional[pybel.Manager]

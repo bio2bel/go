@@ -7,6 +7,7 @@ Bio2BEL GO
    :caption: Contents:
 
    enrichment
+   manager
    constants
 
 Indices and tables

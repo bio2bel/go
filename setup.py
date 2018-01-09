@@ -25,6 +25,7 @@ CLASSIFIERS = [
 INSTALL_REQUIRES = [
     'networkx==1.11',
     'pybel>=0.10.1',
+    'artifactory',
     'obonet',
     'click',
     'bio2bel',

@@ -1,6 +1,6 @@
 networkx==1.11
 pybel>=10.1.0
+artifactory
 obonet
 click
 bio2bel
-

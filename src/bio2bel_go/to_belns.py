@@ -45,7 +45,7 @@ def get_values(go_network):
     return rv
 
 
-def write_belns(path=None, file=None):
+def write_belns(*, path=None, file=None):
     """Writes the GO namespace
 
     .. todo:: add a mapping for molecular function, process, cell component, etc
@@ -73,7 +73,7 @@ def deploy_to_arty():
     file_name = get_today_arty_namespace(MODULE_NAME)
 
     with open(file_name, 'w') as file:
-        write_belns(file)
+        write_belns(file=file)
 
     namespace_deploy_success = deploy_namespace(file_name, MODULE_NAME)
 
@@ -84,5 +84,12 @@ def deploy_to_arty():
 if __name__ == '__main__':
     import os
 
+    logging.basicConfig(level=logging.DEBUG)
+    log.setLevel(logging.DEBUG)
+
+    log.info('writing to desktop')
     with open(os.path.expanduser('~/Desktop/go.belns'), 'w') as f:
         write_belns(file=f)
+
+    log.info('deploying to arty')
+    deploy_to_arty()

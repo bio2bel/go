@@ -37,6 +37,7 @@ def add_parents(go, identifier, graph, child):
 class Manager(object):
     def __init__(self, autopopulate=False):
         self.go = None
+        self.name_id = {}
 
         if autopopulate:
             self.populate()
@@ -44,6 +45,42 @@ class Manager(object):
     def populate(self, path=None, force_download=False):
         if self.go is None:
             self.go = get_go(path=path, force_download=force_download)
+
+            self.name_id = {
+                data['name']: identifier
+                for identifier, data in self.go.nodes_iter(data=True)
+            }
+
+    def get_go_by_id(self, identifier):
+        """Gets a GO entry by its identifier
+
+        :param str identifier:
+        :rtype: Optional[dict]
+        """
+        if not identifier.startswith('GO:'):
+            identifier = 'GO:' + identifier
+
+        rv = self.go.nodes.get(identifier)
+
+        if rv is None:
+            return
+
+        rv['id'] = identifier
+
+        return rv
+
+    def get_go_by_name(self, name):
+        """Gets a GO entry by name
+
+        :param str name:
+        :rtype: Optional[dict]
+        """
+        identifier = self.name_id.get(name)
+
+        if identifier is None:
+            return
+
+        return self.get_go_by_id(identifier)
 
     def enrich_bioprocesses(self, graph):
         """Enriches a BEL Graph?

@@ -1,5 +1,5 @@
-Gene Ontology to BEL
-====================
+Bio2BEL GO |build| |coverage| |docs|
+====================================
 Converts the Gene Ontology (GO) to BEL
 
 Citation
@@ -19,3 +19,15 @@ In an example of GO annotation, the gene product "cytochrome c" can be described
 Links
 -----
 - http://geneontology.org/page/ontology-documentation
+
+.. |build| image:: https://travis-ci.org/bio2bel/go.svg?branch=master
+    :target: https://travis-ci.org/bio2bel/go
+    :alt: Build Status
+
+.. |coverage| image:: https://codecov.io/gh/bio2bel/go/coverage.svg?branch=master
+    :target: https://codecov.io/gh/bio2bel/go?branch=master
+    :alt: Coverage Status
+
+.. |docs| image:: http://readthedocs.org/projects/bio2bel-go/badge/?version=latest
+    :target: http://bio2bel.readthedocs.io/projects/go/en/latest/?badge=latest
+    :alt: Documentation Status

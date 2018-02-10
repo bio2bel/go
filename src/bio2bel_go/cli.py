@@ -35,6 +35,7 @@ def write_bel(output, path):
     graph = m.to_bel()
     pybel.to_bel(graph, output)
 
+
 @main.command()
 def store():
     """Store GO BEL Graph to PyBEL edge store"""

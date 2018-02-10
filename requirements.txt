@@ -1,5 +1,5 @@
 networkx==1.11
-pybel>=10.1.0
+pybel>=0.10.0
 artifactory
 obonet
 click

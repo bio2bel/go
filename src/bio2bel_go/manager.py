@@ -7,7 +7,7 @@ import networkx as nx
 
 from bio2bel_go.parser import get_go
 from pybel import BELGraph
-from pybel.constants import BIOPROCESS, FUNCTION, IS_A, NAME, NAMESPACE
+from pybel.constants import BIOPROCESS, FUNCTION, IDENTIFIER, IS_A, NAME, NAMESPACE
 from pybel.dsl import bioprocess, complex_abundance
 from pybel.resources.arty import get_latest_arty_namespace
 from .constants import MODULE_NAME
@@ -16,18 +16,28 @@ log = logging.getLogger(__name__)
 
 GO = MODULE_NAME.upper()
 
+BEL_NAMESPACES = {
+    'GO',
+    'GOBP',
+    'GOBPID',
+    'GOCC',
+    'GOCCID',
+    'GOMF',
+    'GOMFID',
+}
+
 
 def add_parents(go, identifier, graph, child):
     """
 
     :param go: GO Network
-    :param identifier: GO Identifier
+    :param identifier: GO Identifier of the child
     :param pybel.BELGraph graph: BEL Graph
     :param child: PyBEL node tuple (child node)
     :type child: tuple or dict
     """
     for _, parent_identifier in go.out_edges_iter(identifier):
-        graph.add_unqualified_edge(
+        graph.add_unqualified_edge(  # TODO switch to graph.add_is_a
             child,
             bioprocess(namespace=GO, name=go.node[parent_identifier]['name'], identifier=parent_identifier),
             IS_A
@@ -82,6 +92,48 @@ class Manager(object):
 
         return self.get_go_by_id(identifier)
 
+    def guess_identifier(self, data):
+        """Guesses the identifier from a PyBEL node data dictionary
+
+        :param dict data:
+        :rtype: Optional[str]
+        """
+        namespace = data.get(NAMESPACE)
+
+        if namespace is None:
+            raise ValueError('namespace must not be None')
+
+        if namespace not in BEL_NAMESPACES:
+            raise ValueError('namespace is not valid for GO: {}'.format(namespace))
+
+        identifier = data.get(IDENTIFIER)
+
+        if identifier:
+            if identifier in self.go:
+                return identifier
+
+            if not identifier.startswith('GO:'):
+                augumented_identifier = 'GO:{}'.format(identifier)
+
+                if augumented_identifier in self.go:
+                    return augumented_identifier
+
+        name = data.get(NAME)
+
+        if name is None:
+            raise ValueError
+
+        if name in self.name_id:
+            return self.name_id[name]
+
+        if name in self.go:
+            return name
+
+        augumented_identifier = 'GO:{}'.format(identifier)
+
+        if augumented_identifier in self.go:
+            return augumented_identifier
+
     def enrich_bioprocesses(self, graph):
         """Enriches a BEL Graph?
 
@@ -90,27 +142,14 @@ class Manager(object):
         if self.go is None:
             self.populate()
 
-        name_id = {
-            data['name']: node
-            for node, data in self.go.nodes_iter(data=True)
-        }
-
         for node, data in graph.nodes(data=True):
             if data[FUNCTION] != BIOPROCESS:
                 continue
 
-            namespace = data.get(NAMESPACE)
+            identifier = self.guess_identifier(data)
 
-            if namespace is None:
-                continue
-
-            name = data.get(NAME)
-
-            if namespace in {'GO', 'GOBP', 'GOBPID'}:
-                if name in name_id:
-                    add_parents(self.go, name_id[name], graph, child=node)
-                elif name in self.go:
-                    add_parents(self.go, name, graph, child=node)
+            if identifier:
+                add_parents(self.go, identifier, graph, child=node)
 
     def get_release_date(self):
         """Converts the OBO release date to a ISO 8601 version. Example: 'releases/2017-03-26'"""

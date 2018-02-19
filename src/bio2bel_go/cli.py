@@ -14,7 +14,15 @@ from bio2bel_go.to_belns import write_belns
 @click.group()
 def main():
     """GO to BEL"""
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+
+@main.command()
+def summarize():
+    """Summarize the contents of the graph"""
+    m = Manager()
+    for k, v in m.summarize().items():
+        click.echo('{}: {}'.format(k.capitalize(), v))
 
 
 @main.command()

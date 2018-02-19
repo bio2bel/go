@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import os
 import time
 
 import networkx as nx
@@ -10,7 +11,7 @@ from pybel import BELGraph
 from pybel.constants import BIOPROCESS, FUNCTION, IDENTIFIER, IS_A, NAME, NAMESPACE
 from pybel.dsl import bioprocess, complex_abundance
 from pybel.resources.arty import get_latest_arty_namespace
-from .constants import MODULE_NAME
+from .constants import GO_OBO_PICKLE_PATH, MODULE_NAME
 
 log = logging.getLogger(__name__)
 
@@ -45,11 +46,11 @@ def add_parents(go, identifier, graph, child):
 
 
 class Manager(object):
-    def __init__(self, autopopulate=False):
+    def __init__(self):
         self.go = None
         self.name_id = {}
 
-        if autopopulate:
+        if os.path.exists(GO_OBO_PICKLE_PATH):
             self.populate()
 
     def populate(self, path=None, force_download=False):

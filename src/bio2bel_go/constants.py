@@ -11,4 +11,7 @@ DEFAULT_CACHE_CONNECTION = get_connection(MODULE_NAME)
 #: The web location of the GO OBO file
 GO_OBO_URL = 'http://purl.obolibrary.org/obo/go/go-basic.obo'
 #: The local cache location where the GO OBO file is stored
-GO_OBO_FILE = os.path.join(DATA_DIR, 'go-basic.obo')
+GO_OBO_PATH = os.path.join(DATA_DIR, 'go-basic.obo')
+
+#: The local cache location where the parsed and pickled GO OBO file is stored
+GO_OBO_PICKLE_PATH = os.path.join(DATA_DIR, 'go-basic.obo.gpickle')

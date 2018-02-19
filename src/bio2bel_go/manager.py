@@ -61,6 +61,20 @@ class Manager(object):
                 for identifier, data in self.go.nodes_iter(data=True)
             }
 
+    def count_entries(self):
+        """Counts the number of entries in the GO hierarchy
+
+        :rtype: int
+        """
+        return self.go.number_of_nodes()
+
+    def summarize(self):
+        """Returns a summary dictionary over the content of the database
+
+        :rtype: dict[str,int]
+        """
+        return dict(entries=self.count_entries())
+
     def get_go_by_id(self, identifier):
         """Gets a GO entry by its identifier
 

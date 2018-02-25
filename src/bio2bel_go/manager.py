@@ -187,7 +187,7 @@ class Manager(object):
             authors='Gene Ontology Consortium'
         )
 
-        rv.namespace_url[GO] = get_latest_arty_namespace(GO)
+        rv.namespace_url[GO] = get_latest_arty_namespace('go')
 
         for identifier, data in self.go.nodes(data=True):
             name = data.get('name')

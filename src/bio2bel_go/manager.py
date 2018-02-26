@@ -85,7 +85,7 @@ class Manager(object):
         if not identifier.startswith('GO:'):
             identifier = 'GO:' + identifier
 
-        rv = self.go.nodes.get(identifier)
+        rv = self.go.node.get(identifier)
 
         if rv is None:
             return

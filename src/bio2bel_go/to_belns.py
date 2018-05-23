@@ -1,19 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import logging
-
 import networkx as nx
 
-from bio2bel_go.constants import MODULE_NAME
 from bio2bel_go.parser import get_go
 from pybel.constants import NAMESPACE_DOMAIN_BIOPROCESS, belns_encodings
-from pybel.resources.arty import get_today_arty_namespace
 from pybel.resources.definitions import write_namespace
-from pybel.resources.deploy import deploy_namespace
 
 __all__ = [
     'write_belns',
-    'deploy_to_arty'
 ]
 
 log = logging.getLogger(__name__)
@@ -68,19 +63,6 @@ def write_belns(*, path=None, file=None):
     )
 
 
-def deploy_to_arty():
-    """Gets the data, writes BEL namespace"""
-    file_name = get_today_arty_namespace(MODULE_NAME)
-
-    with open(file_name, 'w') as file:
-        write_belns(file=file)
-
-    namespace_deploy_success = deploy_namespace(file_name, MODULE_NAME)
-
-    if not namespace_deploy_success:
-        log.warning('did not redeploy')
-
-
 if __name__ == '__main__':
     import os
 
@@ -90,6 +72,3 @@ if __name__ == '__main__':
     log.info('writing to desktop')
     with open(os.path.expanduser('~/Desktop/go.belns'), 'w') as f:
         write_belns(file=f)
-
-    log.info('deploying to arty')
-    deploy_to_arty()

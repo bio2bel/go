@@ -1,21 +1,24 @@
 # -*- coding: utf-8 -*-
 
+"""Manager for Bio2BEL GO."""
+
 import logging
-import os
 import time
+from typing import List, Optional
 
 import networkx as nx
+from tqdm import tqdm
 
-from bio2bel_go.parser import get_go
+from bio2bel.namespace_manager import NamespaceManagerMixin
 from pybel import BELGraph
-from pybel.constants import BIOPROCESS, FUNCTION, IDENTIFIER, IS_A, NAME, NAMESPACE
-from pybel.dsl import bioprocess, complex_abundance
-from pybel.resources.arty import get_latest_arty_namespace
-from .constants import GO_OBO_PICKLE_PATH, MODULE_NAME
+from pybel.constants import BIOPROCESS, FUNCTION, IDENTIFIER, NAME, NAMESPACE
+from pybel.manager.models import NamespaceEntry
+from .constants import MODULE_NAME
+from .dsl import gobp
+from .models import Base, Hierarchy, Synonym, Term
+from .parser import get_go
 
 log = logging.getLogger(__name__)
-
-GO = MODULE_NAME.upper()
 
 BEL_NAMESPACES = {
     'GO',
@@ -30,71 +33,126 @@ BEL_NAMESPACES = {
 
 def add_parents(go, identifier, graph, child):
     """
-
     :param go: GO Network
     :param identifier: GO Identifier of the child
-    :param pybel.BELGraph graph: BEL Graph
-    :param child: PyBEL node tuple (child node)
-    :type child: tuple or dict
+    :param pybel.BELGraph graph: A BEL graph
+    :param BaseEntity child: A BEL node
     """
-    for _, parent_identifier in go.out_edges_iter(identifier):
-        graph.add_unqualified_edge(  # TODO switch to graph.add_is_a
-            child,
-            bioprocess(namespace=GO, name=go.node[parent_identifier]['name'], identifier=parent_identifier),
-            IS_A
-        )
+    for _, parent_identifier in go.out_edges(identifier):
+        graph.add_is_a(child, gobp(go, identifier))
 
 
-class Manager(object):
-    def __init__(self):
+_go_prefix = 'GO:'
+
+
+def normalize_go_id(identifier: str) -> str:
+    if identifier.startswith(_go_prefix):
+        return identifier[len(_go_prefix):]
+    return identifier
+
+
+class Manager(NamespaceManagerMixin):
+    """Manager for Bio2BEL GO."""
+
+    module_name = MODULE_NAME
+    flask_admin_models = [Term, Hierarchy, Synonym]
+    namespace_model = Term
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
         self.go = None
+        self.terms = {}
         self.name_id = {}
 
-        if os.path.exists(GO_OBO_PICKLE_PATH):
-            self.populate()
+    @property
+    def _base(self):
+        return Base
+
+    def is_populated(self) -> bool:
+        """Check if the database is already populated"""
+        return 0 < self.count_terms()
+
+    def get_term_by_id(self, go_id) -> Optional[Term]:
+        """Gets a GO entry by its identifier
+
+        :param str go_id:
+        :rtype: Optional[dict]
+        """
+        go_id = normalize_go_id(go_id)
+        return self.session.query(Term).filter(Term.go_id == go_id).one_or_none()
 
     def populate(self, path=None, force_download=False):
-        if self.go is None:
-            self.go = get_go(path=path, force_download=force_download)
+        self.go = get_go(path=path, force_download=force_download)
 
-            self.name_id = {
-                data['name']: identifier
-                for identifier, data in self.go.nodes_iter(data=True)
-            }
+        log.info('building terms')
+        for go_id, data in tqdm(self.go.nodes(data=True), total=self.go.number_of_nodes(), desc='Terms'):
+            is_complex = 'GO:0032991' in nx.descendants(self.go, go_id)
 
-    def count_entries(self):
+            normalized_go_id = normalize_go_id(go_id)
+
+            term = self.terms[normalized_go_id] = Term(
+                go_id=normalized_go_id,
+                name=data['name'],
+                namespace=data['namespace'],
+                definition=data['def'],
+                is_complex=is_complex,
+                synonyms=[
+                    Synonym(name=name)
+                    for name in data.get('synonym', [])
+                ]
+            )
+            self.session.add(term)
+
+        log.info('building hierarchy')
+        for sub_id, obj_id, data in tqdm(self.go.edges(data=True), total=self.go.number_of_edges(), desc='Edges'):
+            hierarchy = Hierarchy(
+                subject=self.terms[normalize_go_id(sub_id)],
+                object=self.terms[normalize_go_id(obj_id)]
+            )
+            self.session.add(hierarchy)
+
+        t = time.time()
+        log.info('committing models')
+        self.session.commit()
+        log.info('committed models in %.2f seconds', time.time() - t)
+
+    def count_terms(self) -> int:
         """Counts the number of entries in the GO hierarchy
 
         :rtype: int
         """
-        return self.go.number_of_nodes()
+        return self._count_model(Term)
+
+    def count_synonyms(self) -> int:
+        """Counts the number of synonyms in the GO hierarchy
+
+        :rtype: int
+        """
+        return self._count_model(Synonym)
+
+    def count_hierarchies(self) -> int:
+        """Counts the number of synonyms in the GO hierarchy
+
+        :rtype: int
+        """
+        return self._count_model(Hierarchy)
+
+    def list_hierarchies(self) -> List[Hierarchy]:
+        return self._list_model(Hierarchy)
 
     def summarize(self):
         """Returns a summary dictionary over the content of the database
 
         :rtype: dict[str,int]
         """
-        return dict(entries=self.count_entries())
+        return dict(
+            terms=self.count_terms(),
+            synonyms=self.count_synonyms(),
+            hierarchies=self.count_hierarchies(),
+        )
 
-    def get_go_by_id(self, identifier):
-        """Gets a GO entry by its identifier
-
-        :param str identifier:
-        :rtype: Optional[dict]
-        """
-        if not identifier.startswith('GO:'):
-            identifier = 'GO:' + identifier
-
-        rv = self.go.node.get(identifier)
-
-        if rv is None:
-            return
-
-        rv['id'] = identifier
-
-        return rv
-
-    def get_go_by_name(self, name):
+    def get_term_by_name(self, name) -> Optional[Term]:
         """Gets a GO entry by name
 
         :param str name:
@@ -105,13 +163,12 @@ class Manager(object):
         if identifier is None:
             return
 
-        return self.get_go_by_id(identifier)
+        return self.get_term_by_id(identifier)
 
-    def guess_identifier(self, data):
+    def guess_identifier(self, data) -> Optional[str]:
         """Guesses the identifier from a PyBEL node data dictionary
 
         :param dict data:
-        :rtype: Optional[str]
         """
         namespace = data.get(NAMESPACE)
 
@@ -149,11 +206,8 @@ class Manager(object):
         if augumented_identifier in self.go:
             return augumented_identifier
 
-    def enrich_bioprocesses(self, graph):
-        """Enriches a BEL Graph?
-
-        :type graph: pybel.BELGraph
-        """
+    def enrich_bioprocesses(self, graph: BELGraph):
+        """Enriches a BEL graph's biological processes."""
         if self.go is None:
             self.populate()
 
@@ -166,58 +220,53 @@ class Manager(object):
             if identifier:
                 add_parents(self.go, identifier, graph, child=node)
 
-    def get_release_date(self):
+    def get_release_date(self) -> str:
         """Converts the OBO release date to a ISO 8601 version. Example: 'releases/2017-03-26'"""
         t = time.strptime(self.go.graph['data-version'], 'releases/%Y-%m-%d')
         return time.strftime('%Y%m%d', t)
+
+    def _get_identifier(self, model):
+        return model.go_id
+
+    def _create_namespace_entry_from_model(self, model, namespace):
+        rv = NamespaceEntry(name=model.name, identifier=model.go_id, namespace=namespace)
+
+        if model.namespace == 'biological_process':
+            rv.encoding = 'B'
+
+        elif model.namespace == 'cellular_component':
+            if model.is_complex:
+                rv.encoding = 'C'
+            else:
+                rv.encoding = 'Y'
+
+        elif model.namespace == 'molecular_function':
+            rv.encoding = 'F'
+
+        return rv
 
     def to_bel(self):
         """Converts Gene Ontology to BEL, with given strategies
 
         :rtype: pybel.BELGraph
         """
-        if self.go is None:
-            self.populate()
-
         rv = BELGraph(
             name='Gene Ontology',
-            version=self.get_release_date(),
+            version='1.0.0',
             description='Gene Ontology: the framework for the model of biology. The GO defines concepts/classes used '
                         'to describe gene function, and relationships between these concepts',
             authors='Gene Ontology Consortium'
         )
 
-        rv.namespace_url[GO] = get_latest_arty_namespace('go')
+        namespace = self.upload_bel_namespace()
+        rv.namespace_url[namespace.keyword] = namespace.url
 
-        for identifier, data in self.go.nodes(data=True):
-            name = data.get('name')
+        for hierarchy in tqdm(self.list_hierarchies(), total=self.count_hierarchies(),
+                              desc='Mapping GO hierarchy to BEL'):
+            sub = hierarchy.subject.as_bel()
+            obj = hierarchy.object.as_bel()
 
-            if name is None:
-                log.warning('missing name: %s', identifier)
-                continue
-
-            namespace = data['namespace']
-
-            if namespace == 'biological_process':
-                add_parents(self.go, identifier, rv, child=gobp(self.go, identifier))
-
-            elif 'GO:0032991' in nx.descendants(self.go, identifier):  # GO:0032991 is "macromolecular complex"
-                add_parents(self.go, identifier, rv, child=gocc(self.go, identifier))
+            if sub and obj:
+                rv.add_is_a(sub, obj)
 
         return rv
-
-
-def gocc(go, identifier):
-    """Makes a GO complex node
-
-    :rtype: complex_abundance
-    """
-    return complex_abundance(namespace=GO, name=go.node[identifier]['name'], identifier=identifier, members=[])
-
-
-def gobp(go, identifier):
-    """Makes a GO biological process node
-
-    :rtype: bioprocess
-    """
-    return bioprocess(namespace=GO, name=go.node[identifier]['name'], identifier=identifier)

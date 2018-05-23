@@ -4,3 +4,4 @@ artifactory
 obonet
 click
 bio2bel
+tqdm

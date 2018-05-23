@@ -29,6 +29,7 @@ INSTALL_REQUIRES = [
     'obonet',
     'click',
     'bio2bel',
+    'tqdm',
 ]
 ENTRY_POINTS = {
     'bio2bel': [

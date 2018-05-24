@@ -3,21 +3,19 @@
 import logging
 import unittest
 
-from bio2bel_go import Manager
 from pybel import BELGraph
 from pybel.dsl import bioprocess
+from tests.constants import TemporaryCacheClass
 
 log = logging.getLogger(__name__)
 
 
-class TestEnrich(unittest.TestCase):
+class TestEnrich(TemporaryCacheClass):
     """Tests functions that enrich BEL graph's contents related to Gene Ontology"""
 
     @classmethod
-    def setUpClass(cls):
-        """Sets up class to contain a persistent GO Manager"""
-        cls.manager = Manager()
-        cls.manager.populate()  # FIXME use test data?
+    def populate(cls):
+        cls.manager.populate()
 
     def setUp(self):
         self.graph = BELGraph()

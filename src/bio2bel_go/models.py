@@ -4,21 +4,20 @@
 
 from typing import Optional
 
+from pybel.dsl import abundance, named_complex_abundance
 from pybel.dsl.nodes import BaseEntity
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 from sqlalchemy.orm import backref, relationship
 
 from .constants import MODULE_NAME
-from .dsl import gobp, gocc
+from .dsl import gobp
 
 TERM_TABLE_NAME = f'{MODULE_NAME}_term'
 SYNONYM_TABLE_NAME = f'{MODULE_NAME}_synonym'
 HIERARCHY_TABLE_NAME = f'{MODULE_NAME}_hierarchy'
 
 Base: DeclarativeMeta = declarative_base()
-
-_GO_NAMESPACE = MODULE_NAME.upper()
 
 
 class Term(Base):
@@ -43,8 +42,19 @@ class Term(Base):
         if self.namespace == 'biological_process':
             return gobp(name=self.name, identifier=self.go_id)
 
-        if self.namespace == 'cellular_component' and self.is_complex:
-            return gocc(name=self.name, identifier=self.go_id)
+        if self.namespace == 'cellular_component':
+            if self.is_complex:
+                return named_complex_abundance(
+                    namespace='go',
+                    name=self.name,
+                    identifier=self.go_id,
+                )
+            else:
+                return abundance(
+                    namespace='go',
+                    name=self.name,
+                    identifier=self.go_id,
+                )
 
 
 class Synonym(Base):

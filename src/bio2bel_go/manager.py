@@ -3,20 +3,20 @@
 """Manager for Bio2BEL GO."""
 
 import logging
-import time
-from typing import List, Mapping, Optional
+from typing import Iterable, List, Mapping, Optional, Tuple
 
 import networkx as nx
-from bio2bel import AbstractManager
-from bio2bel.manager.bel_manager import BELManagerMixin
-from bio2bel.manager.flask_manager import FlaskMixin
-from bio2bel.manager.namespace_manager import BELNamespaceManagerMixin
+import time
 from pybel import BELGraph
 from pybel.constants import BIOPROCESS, FUNCTION, IDENTIFIER, NAME, NAMESPACE
 from pybel.manager.models import Namespace, NamespaceEntry
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from tqdm import tqdm
 
+from bio2bel import AbstractManager
+from bio2bel.manager.bel_manager import BELManagerMixin
+from bio2bel.manager.flask_manager import FlaskMixin
+from bio2bel.manager.namespace_manager import BELNamespaceManagerMixin
 from .constants import MODULE_NAME
 from .dsl import gobp
 from .models import Base, Hierarchy, Synonym, Term
@@ -87,14 +87,14 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
         """Check if the database is already populated."""
         return 0 < self.count_terms()
 
-    def get_term_by_id(self, go_id) -> Optional[Term]:
-        """Get a GO entry by its identifier.
-
-        :param str go_id:
-        :rtype: Optional[dict]
-        """
+    def get_term_by_id(self, go_id: str) -> Optional[Term]:
+        """Get a GO entry by its identifier."""
         go_id = normalize_go_id(go_id)
         return self.session.query(Term).filter(Term.go_id == go_id).one_or_none()
+
+    def get_term_by_name(self, name: str) -> Optional[Term]:
+        """Get a GO entry by name."""
+        return self.session.query(Term).filter(Term.name == name).one_or_none()
 
     def populate(self, path=None, force_download=False) -> None:
         """Populate the database.
@@ -158,55 +158,52 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
             hierarchies=self.count_hierarchies(),
         )
 
-    def get_term_by_name(self, name: str) -> Optional[Term]:
-        """Get a GO entry by name."""
-        identifier = self.name_id.get(name)
-
-        if identifier is None:
-            return
-
-        return self.get_term_by_id(identifier)
-
-    def guess_identifier(self, data: dict) -> Optional[str]:
+    def _lookup_term(self, data: dict) -> Optional[Term]:
         """Guess the identifier from a PyBEL node data dictionary."""
         namespace = data.get(NAMESPACE)
 
-        if namespace is None:
-            raise ValueError('namespace must not be None')
-
-        if namespace not in BEL_NAMESPACES:
-            raise ValueError('namespace is not valid for GO: {}'.format(namespace))
+        if namespace is None or namespace not in BEL_NAMESPACES:
+            return
 
         identifier = data.get(IDENTIFIER)
-
         if identifier:
-            nid = normalize_go_id(identifier)
-            if nid in self.go:
-                return nid
+            return self.get_term_by_id(identifier)
 
         name = data[NAME]
+        return self.get_term_by_name(name)
 
-        if name in self.name_id:
-            return self.name_id[name]
+    def _iter_terms(self, graph) -> Iterable[Tuple[tuple, dict, Term]]:
+        for node_tuple, node_data in graph.nodes(data=True):
+            term = self._lookup_term(node_data)
+            if term is not None:
+                yield node_tuple, node_data, term
 
-        name = normalize_go_id(name)
+    def normalize_terms(self, graph: BELGraph) -> None:
+        """Add identifiers to all GO terms."""
+        mapping = {}
 
-        if name in self.go:  # if for some reason this was mistakenly used as the name
-            return name
+        for node_tuple, node_data, term in self._iter_terms(graph):
+            dsl = term.as_bel()
+            graph.node[node_tuple] = dsl
+            mapping[node_tuple] = dsl.as_tuple()
 
-    def enrich_bioprocesses(self, graph: BELGraph):
+        nx.relabel_nodes(graph, mapping, copy=False)
+
+    def enrich_bioprocesses(self, graph: BELGraph) -> None:
         """Enrich a BEL graph's biological processes."""
-        if self.go is None:
-            self.populate()
+        self.add_namespace_to_graph(graph)
 
-        for node, data in graph.nodes(data=True):
-            if data[FUNCTION] != BIOPROCESS:
+        for node_tuple, node_data, term in self._iter_terms(graph):
+            if node_data[FUNCTION] != BIOPROCESS:
                 continue
 
-            identifier = self.guess_identifier(data)
+            term = self._lookup_term(node_data)
 
-            if identifier:
-                add_parents(self.go, identifier, graph, child=node)
+            for hierarchy in term.in_edges:
+                graph.add_is_a(hierarchy.subject.as_bel(), node_tuple)
+
+            for hierarchy in term.out_edges:
+                graph.add_is_a(node_tuple, hierarchy.object.as_bel())
 
     def get_release_date(self) -> str:
         """Convert the OBO release date to a ISO 8601 version.

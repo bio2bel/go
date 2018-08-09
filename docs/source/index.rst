@@ -6,7 +6,6 @@ Bio2BEL GO
    :maxdepth: 2
    :caption: Contents:
 
-   enrichment
    manager
    constants
 

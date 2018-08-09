@@ -4,19 +4,23 @@
 
 import logging
 import time
-from typing import List, Optional
+from typing import List, Mapping, Optional
 
 import networkx as nx
-from tqdm import tqdm
-
-from bio2bel.namespace_manager import NamespaceManagerMixin
+from bio2bel import AbstractManager
+from bio2bel.manager.bel_manager import BELManagerMixin
+from bio2bel.manager.flask_manager import FlaskMixin
+from bio2bel.manager.namespace_manager import BELNamespaceManagerMixin
 from pybel import BELGraph
 from pybel.constants import BIOPROCESS, FUNCTION, IDENTIFIER, NAME, NAMESPACE
-from pybel.manager.models import NamespaceEntry
+from pybel.manager.models import Namespace, NamespaceEntry
+from sqlalchemy.ext.declarative import DeclarativeMeta
+from tqdm import tqdm
+
 from .constants import MODULE_NAME
 from .dsl import gobp
 from .models import Base, Hierarchy, Synonym, Term
-from .parser import get_go
+from .parser import get_go_from_obo
 
 log = logging.getLogger(__name__)
 
@@ -30,9 +34,14 @@ BEL_NAMESPACES = {
     'GOMFID',
 }
 
+GO_BIOLOGICAL_PROCESS = 'biological_process'
+GO_CELLULAR_COMPONENT = 'cellular_component'
+GO_MOLECULAR_FUNCTION = 'molecular_function'
+
 
 def add_parents(go, identifier, graph, child):
-    """
+    """Add parents to the network.
+
     :param go: GO Network
     :param identifier: GO Identifier of the child
     :param pybel.BELGraph graph: A BEL graph
@@ -42,23 +51,28 @@ def add_parents(go, identifier, graph, child):
         graph.add_is_a(child, gobp(go, identifier))
 
 
-_go_prefix = 'GO:'
-
-
 def normalize_go_id(identifier: str) -> str:
-    if identifier.startswith(_go_prefix):
-        return identifier[len(_go_prefix):]
+    """If a GO term does not start with the ``GO:`` prefix, add it."""
+    if not identifier.startswith('GO:'):
+        return f'GO:{identifier}'
+
     return identifier
 
 
-class Manager(NamespaceManagerMixin):
+class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskMixin):
     """Manager for Bio2BEL GO."""
 
     module_name = MODULE_NAME
     flask_admin_models = [Term, Hierarchy, Synonym]
     namespace_model = Term
 
-    def __init__(self, *args, **kwargs):
+    identifiers_recommended = 'Gene Ontology'
+    identifiers_pattern = '^GO:\d{7}$'
+    identifiers_miriam = 'MIR:00000022'
+    identifiers_namespace = 'go'
+    identifiers_url = 'http://identifiers.org/go/'
+
+    def __init__(self, *args, **kwargs) -> None:  # noqa: D107
         super().__init__(*args, **kwargs)
 
         self.go = None
@@ -66,15 +80,15 @@ class Manager(NamespaceManagerMixin):
         self.name_id = {}
 
     @property
-    def _base(self):
+    def _base(self) -> DeclarativeMeta:
         return Base
 
     def is_populated(self) -> bool:
-        """Check if the database is already populated"""
+        """Check if the database is already populated."""
         return 0 < self.count_terms()
 
     def get_term_by_id(self, go_id) -> Optional[Term]:
-        """Gets a GO entry by its identifier
+        """Get a GO entry by its identifier.
 
         :param str go_id:
         :rtype: Optional[dict]
@@ -82,17 +96,20 @@ class Manager(NamespaceManagerMixin):
         go_id = normalize_go_id(go_id)
         return self.session.query(Term).filter(Term.go_id == go_id).one_or_none()
 
-    def populate(self, path=None, force_download=False):
-        self.go = get_go(path=path, force_download=force_download)
+    def populate(self, path=None, force_download=False) -> None:
+        """Populate the database.
+
+        :param path: Path to the GO OBO file
+        :param force_download:
+        """
+        self.go = get_go_from_obo(path=path, force_download=force_download)
 
         log.info('building terms')
         for go_id, data in tqdm(self.go.nodes(data=True), total=self.go.number_of_nodes(), desc='Terms'):
             is_complex = 'GO:0032991' in nx.descendants(self.go, go_id)
 
-            normalized_go_id = normalize_go_id(go_id)
-
-            term = self.terms[normalized_go_id] = Term(
-                go_id=normalized_go_id,
+            term = self.terms[go_id] = Term(
+                go_id=go_id,
                 name=data['name'],
                 namespace=data['namespace'],
                 definition=data['def'],
@@ -107,8 +124,8 @@ class Manager(NamespaceManagerMixin):
         log.info('building hierarchy')
         for sub_id, obj_id, data in tqdm(self.go.edges(data=True), total=self.go.number_of_edges(), desc='Edges'):
             hierarchy = Hierarchy(
-                subject=self.terms[normalize_go_id(sub_id)],
-                object=self.terms[normalize_go_id(obj_id)]
+                subject=self.terms[sub_id],
+                object=self.terms[obj_id]
             )
             self.session.add(hierarchy)
 
@@ -118,46 +135,31 @@ class Manager(NamespaceManagerMixin):
         log.info('committed models in %.2f seconds', time.time() - t)
 
     def count_terms(self) -> int:
-        """Counts the number of entries in the GO hierarchy
-
-        :rtype: int
-        """
+        """Count the number of entries in GO."""
         return self._count_model(Term)
 
     def count_synonyms(self) -> int:
-        """Counts the number of synonyms in the GO hierarchy
-
-        :rtype: int
-        """
+        """Count the number of synonyms in GO."""
         return self._count_model(Synonym)
 
     def count_hierarchies(self) -> int:
-        """Counts the number of synonyms in the GO hierarchy
-
-        :rtype: int
-        """
+        """Count the number of synonyms in GO."""
         return self._count_model(Hierarchy)
 
     def list_hierarchies(self) -> List[Hierarchy]:
+        """List hierarchy entries."""
         return self._list_model(Hierarchy)
 
-    def summarize(self):
-        """Returns a summary dictionary over the content of the database
-
-        :rtype: dict[str,int]
-        """
+    def summarize(self) -> Mapping[str, int]:
+        """Return a summary dictionary over the content of the database."""
         return dict(
             terms=self.count_terms(),
             synonyms=self.count_synonyms(),
             hierarchies=self.count_hierarchies(),
         )
 
-    def get_term_by_name(self, name) -> Optional[Term]:
-        """Gets a GO entry by name
-
-        :param str name:
-        :rtype: Optional[dict]
-        """
+    def get_term_by_name(self, name: str) -> Optional[Term]:
+        """Get a GO entry by name."""
         identifier = self.name_id.get(name)
 
         if identifier is None:
@@ -165,11 +167,8 @@ class Manager(NamespaceManagerMixin):
 
         return self.get_term_by_id(identifier)
 
-    def guess_identifier(self, data) -> Optional[str]:
-        """Guesses the identifier from a PyBEL node data dictionary
-
-        :param dict data:
-        """
+    def guess_identifier(self, data: dict) -> Optional[str]:
+        """Guess the identifier from a PyBEL node data dictionary."""
         namespace = data.get(NAMESPACE)
 
         if namespace is None:
@@ -181,33 +180,22 @@ class Manager(NamespaceManagerMixin):
         identifier = data.get(IDENTIFIER)
 
         if identifier:
-            if identifier in self.go:
-                return identifier
+            nid = normalize_go_id(identifier)
+            if nid in self.go:
+                return nid
 
-            if not identifier.startswith('GO:'):
-                augumented_identifier = 'GO:{}'.format(identifier)
-
-                if augumented_identifier in self.go:
-                    return augumented_identifier
-
-        name = data.get(NAME)
-
-        if name is None:
-            raise ValueError
+        name = data[NAME]
 
         if name in self.name_id:
             return self.name_id[name]
 
-        if name in self.go:
+        name = normalize_go_id(name)
+
+        if name in self.go:  # if for some reason this was mistakenly used as the name
             return name
 
-        augumented_identifier = 'GO:{}'.format(identifier)
-
-        if augumented_identifier in self.go:
-            return augumented_identifier
-
     def enrich_bioprocesses(self, graph: BELGraph):
-        """Enriches a BEL graph's biological processes."""
+        """Enrich a BEL graph's biological processes."""
         if self.go is None:
             self.populate()
 
@@ -221,36 +209,36 @@ class Manager(NamespaceManagerMixin):
                 add_parents(self.go, identifier, graph, child=node)
 
     def get_release_date(self) -> str:
-        """Converts the OBO release date to a ISO 8601 version. Example: 'releases/2017-03-26'"""
-        t = time.strptime(self.go.graph['data-version'], 'releases/%Y-%m-%d')
-        return time.strftime('%Y%m%d', t)
+        """Convert the OBO release date to a ISO 8601 version.
 
-    def _get_identifier(self, model):
+        Example: 'releases/2017-03-26'
+        """
+        release_time = time.strptime(self.go.graph['data-version'], 'releases/%Y-%m-%d')
+        return time.strftime('%Y%m%d', release_time)
+
+    def _get_identifier(self, model: Term) -> str:
         return model.go_id
 
-    def _create_namespace_entry_from_model(self, model, namespace):
+    def _create_namespace_entry_from_model(self, model: Term, namespace: Namespace) -> NamespaceEntry:
         rv = NamespaceEntry(name=model.name, identifier=model.go_id, namespace=namespace)
 
-        if model.namespace == 'biological_process':
+        if model.namespace == GO_BIOLOGICAL_PROCESS:
             rv.encoding = 'B'
 
-        elif model.namespace == 'cellular_component':
+        elif model.namespace == GO_CELLULAR_COMPONENT:
             if model.is_complex:
                 rv.encoding = 'C'
             else:
                 rv.encoding = 'Y'
 
-        elif model.namespace == 'molecular_function':
+        elif model.namespace == GO_MOLECULAR_FUNCTION:
             rv.encoding = 'F'
 
         return rv
 
-    def to_bel(self):
-        """Converts Gene Ontology to BEL, with given strategies
-
-        :rtype: pybel.BELGraph
-        """
-        rv = BELGraph(
+    def to_bel(self) -> BELGraph:
+        """Convert Gene Ontology to BEL, with given strategies."""
+        graph = BELGraph(
             name='Gene Ontology',
             version='1.0.0',
             description='Gene Ontology: the framework for the model of biology. The GO defines concepts/classes used '
@@ -258,8 +246,7 @@ class Manager(NamespaceManagerMixin):
             authors='Gene Ontology Consortium'
         )
 
-        namespace = self.upload_bel_namespace()
-        rv.namespace_url[namespace.keyword] = namespace.url
+        self.add_namespace_to_graph(graph)
 
         for hierarchy in tqdm(self.list_hierarchies(), total=self.count_hierarchies(),
                               desc='Mapping GO hierarchy to BEL'):
@@ -267,6 +254,6 @@ class Manager(NamespaceManagerMixin):
             obj = hierarchy.object.as_bel()
 
             if sub and obj:
-                rv.add_is_a(sub, obj)
+                graph.add_is_a(sub, obj)
 
-        return rv
+        return graph

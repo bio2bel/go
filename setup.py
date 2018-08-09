@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Setup module for ``bio2bel_expasy``"""
+"""Setup module for Bio2BEL GO."""
 
 import codecs
 import os
@@ -24,12 +24,12 @@ CLASSIFIERS = [
 ]
 INSTALL_REQUIRES = [
     'networkx==1.11',
-    'pybel>=0.10.1',
-    'artifactory',
+    'pybel>=0.11.11',
     'obonet',
     'click',
-    'bio2bel',
+    'bio2bel>=0.1.3',
     'tqdm',
+    'sqlalchemy',
 ]
 ENTRY_POINTS = {
     'bio2bel': [
@@ -53,7 +53,7 @@ META_FILE = read(META_PATH)
 
 
 def find_meta(meta):
-    """Extract __*meta*__ from META_FILE"""
+    """Extract __*meta*__ from META_FILE."""
     meta_match = re.search(
         r'^__{meta}__ = ["\']([^"\']*)["\']'.format(meta=meta),
         META_FILE, re.M

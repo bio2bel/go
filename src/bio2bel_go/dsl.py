@@ -2,30 +2,24 @@
 
 """BEL DSL elements for GO."""
 
-from pybel.dsl import bioprocess, complex_abundance
+from pybel.dsl import bioprocess, named_complex_abundance
+
 from .constants import MODULE_NAME
 
 GO = MODULE_NAME.upper()
 
 
-def gocc(name, identifier):
-    """Makes a GO complex node
-
-    :rtype: complex_abundance
-    """
-    return complex_abundance(
+def gocc(name, identifier) -> named_complex_abundance:
+    """Make a GO complex node."""
+    return named_complex_abundance(
         namespace=GO,
         name=name,
         identifier=identifier,
-        members=[]
     )
 
 
-def gobp(name, identifier):
-    """Makes a GO biological process node
-
-    :rtype: bioprocess
-    """
+def gobp(name, identifier) -> bioprocess:
+    """Make a GO biological process node."""
     return bioprocess(
         namespace=GO,
         name=name,

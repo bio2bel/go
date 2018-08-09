@@ -1,7 +1,7 @@
 networkx==1.11
-pybel>=0.10.0
-artifactory
+pybel>=0.11.11
 obonet
 click
-bio2bel
+bio2bel>=0.1.3
 tqdm
+sqlalchemy

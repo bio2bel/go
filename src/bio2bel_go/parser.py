@@ -1,24 +1,27 @@
 # -*- coding: utf-8 -*-
 
+"""Parser(s) for Gene Ontology."""
+
 import logging
 import os
-from pickle import dump, load
+from typing import Optional
 from urllib.request import urlretrieve
 
 import obonet
+from networkx import MultiDiGraph, read_gpickle, write_gpickle
 
 from .constants import GO_OBO_PATH, GO_OBO_PICKLE_PATH, GO_OBO_URL
-from networkx import write_gpickle, read_gpickle
+
 log = logging.getLogger(__name__)
 
 __all__ = [
     'download_go_obo',
-    'get_go',
+    'get_go_from_obo',
 ]
 
 
-def download_go_obo(force_download=False):
-    """Downloads the GO OBO file
+def download_go_obo(force_download: bool = False):
+    """Download the GO OBO file.
 
     :param force_download: bool to force download
     """
@@ -31,12 +34,11 @@ def download_go_obo(force_download=False):
     return GO_OBO_PATH
 
 
-def get_go(path=None, force_download=False):
-    """Interface to download and parse a GO obo file with :mod:`obonet`.
+def get_go_from_obo(path: Optional[str] = None, force_download: bool = False) -> MultiDiGraph:
+    """Download and parse a GO obo file with :mod:`obonet` into a MultiDiGraph.
 
-    :param Optional[str] path: path to the file
-    :param Optional[bool] force_download: True to force download resources
-    :rtype: networkx.MultiDiGraph
+    :param path: path to the file
+    :param force_download: True to force download resources
     """
     if os.path.exists(GO_OBO_PICKLE_PATH) and not force_download:
         log.info('loading from %s', GO_OBO_PICKLE_PATH)

@@ -2,12 +2,13 @@
 
 """SQLAlchemy models for Bio2BEL GO."""
 
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import backref, relationship
 from typing import Optional
 
 from pybel.dsl.nodes import BaseEntity
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
+from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
+from sqlalchemy.orm import backref, relationship
+
 from .constants import MODULE_NAME
 from .dsl import gobp, gocc
 
@@ -15,7 +16,7 @@ TERM_TABLE_NAME = f'{MODULE_NAME}_term'
 SYNONYM_TABLE_NAME = f'{MODULE_NAME}_synonym'
 HIERARCHY_TABLE_NAME = f'{MODULE_NAME}_hierarchy'
 
-Base = declarative_base()
+Base: DeclarativeMeta = declarative_base()
 
 _GO_NAMESPACE = MODULE_NAME.upper()
 
@@ -39,7 +40,6 @@ class Term(Base):
 
     def as_bel(self) -> Optional[BaseEntity]:
         """Convert this term to a BEL node."""
-
         if self.namespace == 'biological_process':
             return gobp(name=self.name, identifier=self.go_id)
 
@@ -65,6 +65,7 @@ class Synonym(Base):
 
 class Hierarchy(Base):
     """Represents the GO hierarchy."""
+
     __tablename__ = HIERARCHY_TABLE_NAME
 
     id = Column(Integer, primary_key=True)

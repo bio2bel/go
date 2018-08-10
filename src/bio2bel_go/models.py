@@ -56,6 +56,8 @@ class Term(Base):
                     identifier=self.go_id,
                 )
 
+        raise ValueError(f'can not convert {self.namespace}: {self.go_id}/{self.name}')
+
 
 class Synonym(Base):
     """Represents a synonym of a Gene Ontology term."""

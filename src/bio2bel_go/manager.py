@@ -183,7 +183,13 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
         mapping = {}
 
         for node_tuple, node_data, term in self._iter_terms(graph):
-            dsl = term.as_bel()
+            try:
+                dsl = term.as_bel()
+            except ValueError:
+                log.warning('deleting %s', node_tuple)
+                graph.remove_node(node_tuple)
+                continue
+
             graph.node[node_tuple] = dsl
             mapping[node_tuple] = dsl.as_tuple()
 

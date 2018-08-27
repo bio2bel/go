@@ -47,7 +47,7 @@ def get_go_from_obo(path: Optional[str] = None, force_download: bool = False) ->
     if path is None:
         path = download_go_obo(force_download=force_download)
 
-    log.info('parsing pickle')
+    log.info('reading OBO')
     result = obonet.read_obo(path)
 
     log.info('caching pickle to %s', GO_OBO_PICKLE_PATH)

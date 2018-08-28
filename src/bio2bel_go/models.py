@@ -4,12 +4,11 @@
 
 from typing import Optional
 
-from pybel.dsl import abundance, named_complex_abundance
-from pybel.dsl.nodes import BaseEntity
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 from sqlalchemy.orm import backref, relationship
 
+from pybel.dsl import BaseEntity, abundance, named_complex_abundance
 from .constants import MODULE_NAME
 from .dsl import gobp
 

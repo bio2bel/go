@@ -36,6 +36,14 @@ class Term(Base):
     def __repr__(self):
         return self.name
 
+    def to_json(self):
+        return dict(
+            name=self.name,
+            namespace=self.namespace,
+            definition=self.definition,
+            go_id=self.go_id,
+        )
+
     def as_bel(self) -> Optional[BaseEntity]:
         """Convert this term to a BEL node."""
         if self.namespace == 'biological_process':

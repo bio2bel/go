@@ -3,17 +3,16 @@
 """Manager for Bio2BEL GO."""
 
 import logging
-from typing import Iterable, List, Mapping, Optional, Tuple
-
 import networkx as nx
 import time
-from sqlalchemy.ext.declarative import DeclarativeMeta
-from tqdm import tqdm
-
 from bio2bel import AbstractManager
 from bio2bel.manager.bel_manager import BELManagerMixin
 from bio2bel.manager.flask_manager import FlaskMixin
 from bio2bel.manager.namespace_manager import BELNamespaceManagerMixin
+from sqlalchemy.ext.declarative import DeclarativeMeta
+from tqdm import tqdm
+from typing import Iterable, List, Mapping, Optional, Tuple
+
 from pybel import BELGraph
 from pybel.constants import BIOPROCESS, FUNCTION, IDENTIFIER, NAME, NAMESPACE
 from pybel.dsl import BaseEntity
@@ -159,42 +158,42 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
             hierarchies=self.count_hierarchies(),
         )
 
-    def _lookup_term(self, data: BaseEntity) -> Optional[Term]:
+    def lookup_term(self, node: BaseEntity) -> Optional[Term]:
         """Guess the identifier from a PyBEL node data dictionary."""
-        namespace = data.get(NAMESPACE)
+        namespace = node.get(NAMESPACE)
 
-        if namespace is None or namespace not in BEL_NAMESPACES:
+        if namespace is None or namespace.upper() not in BEL_NAMESPACES:
             return
 
-        identifier = data.get(IDENTIFIER)
+        identifier = node.identifier
         if identifier:
             return self.get_term_by_id(identifier)
 
-        name = data[NAME]
-        return self.get_term_by_name(name)
+        model = self.get_term_by_id(node.name)
+        if model is not None:
+            return model
+
+        return self.get_term_by_name(node.name)
 
     def iter_terms(self, graph: BELGraph) -> Iterable[Tuple[BaseEntity, Term]]:
-        for _, node_data in graph.nodes(data=True):
-            term = self._lookup_term(node_data)
+        for node in graph:
+            term = self.lookup_term(node)
             if term is not None:
-                yield node_data, term
+                yield node, term
 
     def normalize_terms(self, graph: BELGraph) -> None:
         """Add identifiers to all GO terms."""
         mapping = {}
 
-        for node_data, term in self.iter_terms(graph):
-            node_tuple = node_data.as_tuple()
-
+        for node, term in list(self.iter_terms(graph)):
             try:
                 dsl = term.as_bel()
             except ValueError:
-                log.warning('deleting %s', node_data)
-                graph.remove_node(node_tuple)
+                log.warning('deleting %s', node)
+                graph.remove_node(node)
                 continue
 
-            graph._node[node_tuple] = dsl
-            mapping[node_tuple] = dsl.as_tuple()
+            mapping[node] = dsl
 
         nx.relabel_nodes(graph, mapping, copy=False)
 
@@ -202,17 +201,15 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
         """Enrich a BEL graph's biological processes."""
         self.add_namespace_to_graph(graph)
 
-        for node_data, term in self.iter_terms(graph):
-            if node_data[FUNCTION] != BIOPROCESS:
+        for node, term in list(self.iter_terms(graph)):
+            if node[FUNCTION] != BIOPROCESS:
                 continue
 
-            term = self._lookup_term(node_data)
-
             for hierarchy in term.in_edges:
-                graph.add_is_a(hierarchy.subject.as_bel(), node_data)
+                graph.add_is_a(hierarchy.subject.as_bel(), node)
 
             for hierarchy in term.out_edges:
-                graph.add_is_a(node_data, hierarchy.object.as_bel())
+                graph.add_is_a(node, hierarchy.object.as_bel())
 
     def get_release_date(self) -> str:
         """Convert the OBO release date to a ISO 8601 version.

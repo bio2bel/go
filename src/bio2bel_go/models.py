@@ -2,7 +2,7 @@
 
 """SQLAlchemy models for Bio2BEL GO."""
 
-from typing import Optional
+from typing import Mapping, Optional
 
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
@@ -36,7 +36,8 @@ class Term(Base):
     def __repr__(self):
         return self.name
 
-    def to_json(self):
+    def to_json(self) -> Mapping[str,str]:
+        """Make a summary dictionary for the term."""
         return dict(
             name=self.name,
             namespace=self.namespace,

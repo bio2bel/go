@@ -23,8 +23,8 @@ CLASSIFIERS = [
     'Topic :: Scientific/Engineering :: Bio-Informatics'
 ]
 INSTALL_REQUIRES = [
-    'pybel>=0.11.11',
     'networkx>=2.1',
+    'pybel>=0.12.0,<0.13.0',
     'obonet',
     'click',
     'bio2bel>=0.1.3',

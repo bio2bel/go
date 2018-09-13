@@ -3,7 +3,6 @@
 """Testing constants for Bio2BEL GO."""
 
 from bio2bel.testing import AbstractTemporaryCacheClassMixin
-
 from bio2bel_go import Manager
 
 __all__ = [

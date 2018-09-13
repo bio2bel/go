@@ -3,18 +3,19 @@
 """Manager for Bio2BEL GO."""
 
 import logging
-import networkx as nx
 import time
+from typing import Iterable, List, Mapping, Optional, Tuple
+
+import networkx as nx
+from sqlalchemy.ext.declarative import DeclarativeMeta
+from tqdm import tqdm
+
 from bio2bel import AbstractManager
 from bio2bel.manager.bel_manager import BELManagerMixin
 from bio2bel.manager.flask_manager import FlaskMixin
 from bio2bel.manager.namespace_manager import BELNamespaceManagerMixin
-from sqlalchemy.ext.declarative import DeclarativeMeta
-from tqdm import tqdm
-from typing import Iterable, List, Mapping, Optional, Tuple
-
 from pybel import BELGraph
-from pybel.constants import BIOPROCESS, FUNCTION, IDENTIFIER, NAME, NAMESPACE
+from pybel.constants import BIOPROCESS, FUNCTION, NAMESPACE
 from pybel.dsl import BaseEntity
 from pybel.manager.models import Namespace, NamespaceEntry
 from .constants import MODULE_NAME
@@ -176,6 +177,7 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
         return self.get_term_by_name(node.name)
 
     def iter_terms(self, graph: BELGraph) -> Iterable[Tuple[BaseEntity, Term]]:
+        """Iterate over nodes in the graph that can be looked up."""
         for node in graph:
             term = self.lookup_term(node)
             if term is not None:
@@ -192,15 +194,14 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
                 log.warning('deleting %s', node)
                 graph.remove_node(node)
                 continue
-
-            mapping[node] = dsl
+            else:
+                mapping[node] = dsl
 
         nx.relabel_nodes(graph, mapping, copy=False)
 
     def enrich_bioprocesses(self, graph: BELGraph) -> None:
         """Enrich a BEL graph's biological processes."""
         self.add_namespace_to_graph(graph)
-
         for node, term in list(self.iter_terms(graph)):
             if node[FUNCTION] != BIOPROCESS:
                 continue

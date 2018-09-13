@@ -21,7 +21,11 @@ format = ${cyan}%(path)s${reset}:${yellow_bold}%(row)d${reset}:${green_bold}%(co
 ignore = D105,E501
 
 # flake8-import-order
-application-import-names = bio2bel_go
+application-import-names =
+	bio2bel_go
+	bio2bel
+	pybel
+	tests
 import-order-style = pycharm
 
 # mccabe

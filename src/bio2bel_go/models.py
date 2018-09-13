@@ -36,7 +36,7 @@ class Term(Base):
     def __repr__(self):
         return self.name
 
-    def to_json(self) -> Mapping[str,str]:
+    def to_json(self) -> Mapping[str, str]:
         """Make a summary dictionary for the term."""
         return dict(
             name=self.name,

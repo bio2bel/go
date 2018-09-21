@@ -233,7 +233,7 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
             if model.is_complex:
                 rv.encoding = 'C'
             else:
-                rv.encoding = 'Y'
+                rv.encoding = 'A'
 
         elif model.namespace == GO_MOLECULAR_FUNCTION:
             rv.encoding = 'F'

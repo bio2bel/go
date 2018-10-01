@@ -86,4 +86,7 @@ if __name__ == '__main__':
         package_dir={'': 'src'},
         install_requires=INSTALL_REQUIRES,
         entry_points=ENTRY_POINTS,
+        classifiers=CLASSIFIERS,
+        keywords=KEYWORDS,
+        zip_safe=False,
     )

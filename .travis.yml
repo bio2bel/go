@@ -30,7 +30,6 @@ jobs:
 
 matrix:
   allow_failures:
-      - env: TOXENV=pyroma
       - env: TOXENV=xenon
       - env: TOXENV=vulture
 

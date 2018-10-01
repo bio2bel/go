@@ -2,6 +2,7 @@
 
 """Tests for enrichment."""
 
+from bio2bel_go import Manager
 from pybel import BELGraph
 from pybel.dsl import bioprocess
 from tests.constants import TemporaryCacheClass
@@ -10,13 +11,11 @@ from tests.constants import TemporaryCacheClass
 class TestEnrich(TemporaryCacheClass):
     """Tests functions that enrich BEL graph's contents related to Gene Ontology."""
 
-    @classmethod
-    def populate(cls):
-        """Populate the database."""
-        cls.manager.populate()
+    manager: Manager
 
     def setUp(self):
         """Set up the database with a BEL graph."""
+        super().setUp()
         self.graph = BELGraph()
 
     def help_test_cell_proliferation(self, graph: BELGraph):

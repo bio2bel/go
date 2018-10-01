@@ -40,12 +40,14 @@ def get_go_from_obo(path: Optional[str] = None, force_download: bool = False) ->
     :param path: path to the file
     :param force_download: True to force download resources
     """
-    if os.path.exists(GO_OBO_PICKLE_PATH) and not force_download:
+    if path is None and os.path.exists(GO_OBO_PICKLE_PATH) and not force_download:
         log.info('loading from %s', GO_OBO_PICKLE_PATH)
         return read_gpickle(GO_OBO_PICKLE_PATH)
 
-    if path is None:
-        path = download_go_obo(force_download=force_download)
+    if path is not None:
+        return obonet.read_obo(path)
+
+    path = download_go_obo(force_download=force_download)
 
     log.info('reading OBO')
     result = obonet.read_obo(path)

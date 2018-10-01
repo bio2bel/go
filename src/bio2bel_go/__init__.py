@@ -8,7 +8,7 @@ __all__ = [
     'Manager',
 ]
 
-__version__ = '0.0.1'
+__version__ = '0.0.2-dev'
 
 __title__ = 'bio2bel_go'
 __description__ = "A package for converting GO to BEL"

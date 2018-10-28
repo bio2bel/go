@@ -17,3 +17,17 @@ GO_OBO_PATH = os.path.join(DATA_DIR, 'go-basic.obo')
 
 #: The local cache location where the parsed and pickled GO OBO file is stored
 GO_OBO_PICKLE_PATH = os.path.join(DATA_DIR, 'go-basic.obo.gpickle')
+
+BEL_NAMESPACES = {
+    'GO',
+    'GOBP',
+    'GOBPID',
+    'GOCC',
+    'GOCCID',
+    'GOMF',
+    'GOMFID',
+}
+
+GO_BIOLOGICAL_PROCESS = 'biological_process'
+GO_CELLULAR_COMPONENT = 'cellular_component'
+GO_MOLECULAR_FUNCTION = 'molecular_function'

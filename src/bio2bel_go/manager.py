@@ -18,26 +18,12 @@ from pybel import BELGraph
 from pybel.constants import BIOPROCESS, FUNCTION, NAMESPACE
 from pybel.dsl import BaseEntity
 from pybel.manager.models import Namespace, NamespaceEntry
-from .constants import MODULE_NAME
+from .constants import BEL_NAMESPACES, MODULE_NAME
 from .dsl import gobp
 from .models import Base, Hierarchy, Synonym, Term
 from .parser import get_go_from_obo
 
 log = logging.getLogger(__name__)
-
-BEL_NAMESPACES = {
-    'GO',
-    'GOBP',
-    'GOBPID',
-    'GOCC',
-    'GOCCID',
-    'GOMF',
-    'GOMFID',
-}
-
-GO_BIOLOGICAL_PROCESS = 'biological_process'
-GO_CELLULAR_COMPONENT = 'cellular_component'
-GO_MOLECULAR_FUNCTION = 'molecular_function'
 
 
 def add_parents(go, identifier, graph, child):
@@ -68,7 +54,7 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
 
     namespace_model = Term
     identifiers_recommended = 'Gene Ontology'
-    identifiers_pattern = '^GO:\d{7}$'
+    identifiers_pattern = r'^GO:\d{7}$'
     identifiers_miriam = 'MIR:00000022'
     identifiers_namespace = 'go'
     identifiers_url = 'http://identifiers.org/go/'

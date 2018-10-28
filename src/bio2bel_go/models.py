@@ -9,7 +9,7 @@ from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 from sqlalchemy.orm import backref, relationship
 
 from pybel.dsl import BaseEntity, abundance, named_complex_abundance
-from .constants import MODULE_NAME
+from .constants import GO_BIOLOGICAL_PROCESS, GO_CELLULAR_COMPONENT, GO_MOLECULAR_FUNCTION, MODULE_NAME
 from .dsl import gobp
 
 TERM_TABLE_NAME = f'{MODULE_NAME}_term'
@@ -48,16 +48,16 @@ class Term(Base):
     @property
     def bel_encoding(self) -> Optional[str]:
         """Get the BEL encoding for this term."""
-        if model.namespace == GO_BIOLOGICAL_PROCESS:
+        if self.namespace == GO_BIOLOGICAL_PROCESS:
             return 'B'
 
-        if model.namespace == GO_CELLULAR_COMPONENT:
-            if model.is_complex:
+        if self.namespace == GO_CELLULAR_COMPONENT:
+            if self.is_complex:
                 return 'C'
             else:
                 return 'A'
 
-        if model.namespace == GO_MOLECULAR_FUNCTION:
+        if self.namespace == GO_MOLECULAR_FUNCTION:
             return 'F'
 
     def as_bel(self) -> Optional[BaseEntity]:

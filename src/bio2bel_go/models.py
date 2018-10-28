@@ -45,6 +45,21 @@ class Term(Base):
             go_id=self.go_id,
         )
 
+    @property
+    def bel_encoding(self) -> Optional[str]:
+        """Get the BEL encoding for this term."""
+        if model.namespace == GO_BIOLOGICAL_PROCESS:
+            return 'B'
+
+        if model.namespace == GO_CELLULAR_COMPONENT:
+            if model.is_complex:
+                return 'C'
+            else:
+                return 'A'
+
+        if model.namespace == GO_MOLECULAR_FUNCTION:
+            return 'F'
+
     def as_bel(self) -> Optional[BaseEntity]:
         """Convert this term to a BEL node."""
         if self.namespace == 'biological_process':

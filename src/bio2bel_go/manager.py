@@ -65,8 +65,8 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
 
     module_name = MODULE_NAME
     flask_admin_models = [Term, Hierarchy, Synonym]
-    namespace_model = Term
 
+    namespace_model = Term
     identifiers_recommended = 'Gene Ontology'
     identifiers_pattern = '^GO:\d{7}$'
     identifiers_miriam = 'MIR:00000022'
@@ -223,22 +223,13 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
     def _get_identifier(self, model: Term) -> str:
         return model.go_id
 
-    def _create_namespace_entry_from_model(self, model: Term, namespace: Namespace) -> NamespaceEntry:
-        rv = NamespaceEntry(name=model.name, identifier=model.go_id, namespace=namespace)
-
-        if model.namespace == GO_BIOLOGICAL_PROCESS:
-            rv.encoding = 'B'
-
-        elif model.namespace == GO_CELLULAR_COMPONENT:
-            if model.is_complex:
-                rv.encoding = 'C'
-            else:
-                rv.encoding = 'A'
-
-        elif model.namespace == GO_MOLECULAR_FUNCTION:
-            rv.encoding = 'F'
-
-        return rv
+    def _create_namespace_entry_from_model(self, term: Term, namespace: Namespace) -> NamespaceEntry:
+        return NamespaceEntry(
+            name=term.name,
+            identifier=term.go_id,
+            encoding=term.bel_encoding,
+            namespace=namespace,
+        )
 
     def to_bel(self) -> BELGraph:
         """Convert Gene Ontology to BEL, with given strategies."""

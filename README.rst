@@ -1,5 +1,5 @@
-Bio2BEL GO |build| |coverage| |documentation|
-=============================================
+Bio2BEL GO |build| |coverage| |documentation| |zenodo|
+======================================================
 Converts the Gene Ontology (GO) to BEL
 
 Installation |pypi_version| |python_versions| |pypi_license|
@@ -69,3 +69,6 @@ Links
 
 .. |pypi_license| image:: https://img.shields.io/pypi/l/bio2bel_go.svg
     :alt: MIT License
+
+.. |zenodo| image:: https://zenodo.org/badge/99944678.svg
+   :target: https://zenodo.org/badge/latestdoi/99944678

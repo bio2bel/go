@@ -5,11 +5,11 @@
 import logging
 import os
 from typing import Optional
-from urllib.request import urlretrieve
 
 import obonet
 from networkx import MultiDiGraph, read_gpickle, write_gpickle
 
+from bio2bel.downloading import make_downloader
 from .constants import GO_OBO_PATH, GO_OBO_PICKLE_PATH, GO_OBO_URL
 
 log = logging.getLogger(__name__)
@@ -19,19 +19,7 @@ __all__ = [
     'get_go_from_obo',
 ]
 
-
-def download_go_obo(force_download: bool = False):
-    """Download the GO OBO file.
-
-    :param force_download: bool to force download
-    """
-    if os.path.exists(GO_OBO_PATH) and not force_download:
-        log.info('using cached obo file at %s', GO_OBO_PATH)
-    else:
-        log.info('downloading %s to %s', GO_OBO_URL, GO_OBO_PATH)
-        urlretrieve(GO_OBO_URL, GO_OBO_PATH)
-
-    return GO_OBO_PATH
+download_go_obo = make_downloader(GO_OBO_URL, GO_OBO_PATH)
 
 
 def get_go_from_obo(path: Optional[str] = None, force_download: bool = False) -> MultiDiGraph:

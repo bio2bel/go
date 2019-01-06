@@ -58,7 +58,7 @@ class Term(Base):
                 return 'A'
 
         if self.namespace == GO_MOLECULAR_FUNCTION:
-            return 'F'
+            return 'Y'
 
     def as_bel(self) -> Optional[BaseEntity]:
         """Convert this term to a BEL node."""

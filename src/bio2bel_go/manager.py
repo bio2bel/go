@@ -53,6 +53,7 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
     flask_admin_models = [Term, Hierarchy, Synonym]
 
     namespace_model = Term
+    edge_model = Hierarchy
     identifiers_recommended = 'Gene Ontology'
     identifiers_pattern = r'^GO:\d{7}$'
     identifiers_miriam = 'MIR:00000022'

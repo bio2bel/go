@@ -50,6 +50,7 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
     """Manager for Bio2BEL GO."""
 
     module_name = MODULE_NAME
+    _base: DeclarativeMeta = Base
     flask_admin_models = [Term, Hierarchy, Synonym]
 
     namespace_model = Term
@@ -66,10 +67,6 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
         self.go = None
         self.terms = {}
         self.name_id = {}
-
-    @property
-    def _base(self) -> DeclarativeMeta:
-        return Base
 
     def is_populated(self) -> bool:
         """Check if the database is already populated."""

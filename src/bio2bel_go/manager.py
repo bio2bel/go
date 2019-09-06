@@ -7,6 +7,10 @@ import time
 from typing import Iterable, List, Mapping, Optional, Tuple
 
 import networkx as nx
+from pybel import BELGraph
+from pybel.constants import BIOPROCESS, FUNCTION, NAMESPACE
+from pybel.dsl import BaseEntity
+from pybel.manager.models import Namespace, NamespaceEntry
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from tqdm import tqdm
 
@@ -14,25 +18,21 @@ from bio2bel import AbstractManager
 from bio2bel.manager.bel_manager import BELManagerMixin
 from bio2bel.manager.flask_manager import FlaskMixin
 from bio2bel.manager.namespace_manager import BELNamespaceManagerMixin
-from pybel import BELGraph
-from pybel.constants import BIOPROCESS, FUNCTION, NAMESPACE
-from pybel.dsl import BaseEntity
-from pybel.manager.models import Namespace, NamespaceEntry
 from .constants import BEL_NAMESPACES, MODULE_NAME
 from .dsl import gobp
-from .models import Base, Hierarchy, Synonym, Term
-from .parser import get_go_from_obo
+from .models import Annotation, Base, Hierarchy, Synonym, Term
+from .parser import get_go_from_obo, get_goa_all_df
 
 log = logging.getLogger(__name__)
 
 
-def add_parents(go, identifier, graph, child):
+def add_parents(go, identifier: str, graph: BELGraph, child: BaseEntity):
     """Add parents to the network.
 
     :param go: GO Network
     :param identifier: GO Identifier of the child
-    :param pybel.BELGraph graph: A BEL graph
-    :param BaseEntity child: A BEL node
+    :param graph: A BEL graph
+    :param child: A BEL node
     """
     for _, parent_identifier in go.out_edges(identifier):
         graph.add_is_a(child, gobp(go, identifier))
@@ -47,14 +47,14 @@ def normalize_go_id(identifier: str) -> str:
 
 
 class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskMixin):
-    """Manager for Bio2BEL GO."""
+    """Biological process multi-hierarchy."""
 
     module_name = MODULE_NAME
     _base: DeclarativeMeta = Base
-    flask_admin_models = [Term, Hierarchy, Synonym]
+    flask_admin_models = [Term, Hierarchy, Synonym, Annotation]
 
     namespace_model = Term
-    edge_model = Hierarchy
+    edge_model = [Hierarchy, Annotation]
     identifiers_recommended = 'Gene Ontology'
     identifiers_pattern = r'^GO:\d{7}$'
     identifiers_miriam = 'MIR:00000022'
@@ -102,7 +102,7 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
                 synonyms=[
                     Synonym(name=name)
                     for name in data.get('synonym', [])
-                ]
+                ],
             )
             self.session.add(term)
 
@@ -110,9 +110,38 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
         for sub_id, obj_id, data in tqdm(self.go.edges(data=True), total=self.go.number_of_edges(), desc='Edges'):
             hierarchy = Hierarchy(
                 subject=self.terms[sub_id],
-                object=self.terms[obj_id]
+                object=self.terms[obj_id],
             )
             self.session.add(hierarchy)
+
+        log.info('building annotations')
+        annotation_columns = [
+            'go_id',
+            'db',
+            'db_id',
+            'db_symbol',
+            'qualifier',
+            'provenance',
+            'evidence_code',
+            'taxonomy_id',
+        ]
+        goa_df = get_goa_all_df()
+
+        it = tqdm(goa_df[annotation_columns].values, total=len(goa_df.index), desc='Annotations')
+        for go_id, db, db_id, db_symbol, qualifier, provenance, evidence_code, taxonomy_id in it:
+            provenance_db, provenance_id = provenance.split(':')
+            annotation = Annotation(
+                term=self.terms[go_id],
+                db=db,
+                db_id=db_id,
+                db_symbol=db_symbol,
+                qualifier=qualifier,
+                provenance_db=provenance_db,
+                provenance_id=provenance_id,
+                evidence_code=evidence_code,
+                tax_id=taxonomy_id,
+            )
+            self.session.add(annotation)
 
         t = time.time()
         log.info('committing models')
@@ -135,12 +164,21 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
         """List hierarchy entries."""
         return self._list_model(Hierarchy)
 
+    def count_annotations(self) -> int:
+        """Count the number of annotations."""
+        return self._count_model(Annotation)
+
+    def list_annotations(self) -> List[Annotation]:
+        """List annotation entries."""
+        return self._list_model(Annotation)
+
     def summarize(self) -> Mapping[str, int]:
         """Return a summary dictionary over the content of the database."""
         return dict(
             terms=self.count_terms(),
             synonyms=self.count_synonyms(),
             hierarchies=self.count_hierarchies(),
+            annotations=self.count_annotations(),
         )
 
     def lookup_term(self, node: BaseEntity) -> Optional[Term]:
@@ -160,22 +198,27 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
 
         return self.get_term_by_name(node.name)
 
-    def iter_terms(self, graph: BELGraph) -> Iterable[Tuple[BaseEntity, Term]]:
+    def iter_terms(self, graph: BELGraph, use_tqdm: bool = False) -> Iterable[Tuple[BaseEntity, Term]]:
         """Iterate over nodes in the graph that can be looked up."""
-        for node in graph:
+        it = (
+            tqdm(graph, desc='GO terms')
+            if use_tqdm else
+            graph
+        )
+        for node in it:
             term = self.lookup_term(node)
             if term is not None:
                 yield node, term
 
-    def normalize_terms(self, graph: BELGraph) -> None:
+    def normalize_terms(self, graph: BELGraph, use_tqdm: bool = False) -> None:
         """Add identifiers to all GO terms."""
         mapping = {}
 
-        for node, term in list(self.iter_terms(graph)):
+        for node, term in list(self.iter_terms(graph, use_tqdm=use_tqdm)):
             try:
                 dsl = term.as_bel()
             except ValueError:
-                log.warning('deleting %s', node)
+                log.warning('deleting GO node %r', node)
                 graph.remove_node(node)
                 continue
             else:
@@ -183,10 +226,10 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
 
         nx.relabel_nodes(graph, mapping, copy=False)
 
-    def enrich_bioprocesses(self, graph: BELGraph) -> None:
+    def enrich_bioprocesses(self, graph: BELGraph, use_tqdm: bool = False) -> None:
         """Enrich a BEL graph's biological processes."""
         self.add_namespace_to_graph(graph)
-        for node, term in list(self.iter_terms(graph)):
+        for node, term in list(self.iter_terms(graph, use_tqdm=use_tqdm)):
             if node[FUNCTION] != BIOPROCESS:
                 continue
 
@@ -229,10 +272,10 @@ class Manager(AbstractManager, BELManagerMixin, BELNamespaceManagerMixin, FlaskM
 
         for hierarchy in tqdm(self.list_hierarchies(), total=self.count_hierarchies(),
                               desc='Mapping GO hierarchy to BEL'):
-            sub = hierarchy.subject.as_bel()
-            obj = hierarchy.object.as_bel()
+            hierarchy.add_to_graph(graph)
 
-            if sub and obj:
-                graph.add_is_a(sub, obj)
+        for annotation in tqdm(self.list_annotations(), total=self.count_annotations(),
+                               desc='Mapping GO annotations to BEL'):
+            annotation.add_to_graph(graph)
 
         return graph

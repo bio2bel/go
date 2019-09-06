@@ -2,13 +2,13 @@
 
 """BEL DSL elements for GO."""
 
-from pybel.dsl import bioprocess
+from pybel.dsl import BiologicalProcess
 
 
-def gobp(name, identifier) -> bioprocess:
+def gobp(name: str, identifier: str) -> BiologicalProcess:
     """Make a GO biological process node."""
-    return bioprocess(
+    return BiologicalProcess(
         namespace='go',
         name=name,
-        identifier=identifier
+        identifier=identifier,
     )

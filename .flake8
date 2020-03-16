@@ -24,6 +24,7 @@ ignore = D105,E501
 application-import-names =
 	bio2bel_go
 	bio2bel
+	pyobo
 	pybel
 	tests
 import-order-style = pycharm

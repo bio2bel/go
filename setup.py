@@ -23,13 +23,14 @@ CLASSIFIERS = [
     'Topic :: Scientific/Engineering :: Bio-Informatics'
 ]
 INSTALL_REQUIRES = [
-    'networkx>=2.1',
-    'pybel>=0.13.0,<0.14.0',
+    'networkx',
+    'pybel>=0.14.0,<0.15.0',
     'obonet',
     'click',
-    'bio2bel>=0.1.3',
+    'bio2bel>=0.3.3',
     'tqdm',
     'sqlalchemy',
+    'protmapper',
 ]
 ENTRY_POINTS = {
     'bio2bel': [

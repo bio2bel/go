@@ -5,18 +5,10 @@
 import os
 
 from bio2bel import get_data_dir
+from pyobo.path_utils import get_url_filename
 
 MODULE_NAME = 'go'
 DATA_DIR = get_data_dir(MODULE_NAME)
-
-#: The web location of the GO OBO file
-GO_OBO_URL = 'http://purl.obolibrary.org/obo/go/go-basic.obo'
-
-#: The local cache location where the GO OBO file is stored
-GO_OBO_PATH = os.path.join(DATA_DIR, 'go-basic.obo')
-
-#: The local cache location where the parsed and pickled GO OBO file is stored
-GO_OBO_PICKLE_PATH = os.path.join(DATA_DIR, 'go-basic.obo.gpickle')
 
 BEL_NAMESPACES = {
     'GO',
@@ -33,16 +25,16 @@ GO_CELLULAR_COMPONENT = 'cellular_component'
 GO_MOLECULAR_FUNCTION = 'molecular_function'
 
 GO_HUMAN_ANNOTATIONS_URL = 'http://geneontology.org/gene-associations/goa_human.gaf.gz'
-GO_HUMAN_ANNOTATIONS_PATH = os.path.join(DATA_DIR, 'goa_human.gaf.gz')
+GO_HUMAN_ANNOTATIONS_PATH = os.path.join(DATA_DIR, get_url_filename(GO_HUMAN_ANNOTATIONS_URL))
 
 GO_HUMAN_COMPLEX_ANNOTATIONS_URL = 'http://geneontology.org/gene-associations/goa_human_complex.gaf.gz'
-GO_HUMAN_COMPLEX_ANNOTATIONS_PATH = os.path.join(DATA_DIR, 'goa_human_complex.gaf.gz')
+GO_HUMAN_COMPLEX_ANNOTATIONS_PATH = os.path.join(DATA_DIR, get_url_filename(GO_HUMAN_COMPLEX_ANNOTATIONS_URL))
 
 GO_HUMAN_ISOFORM_ANNOTATIONS_URL = 'http://geneontology.org/gene-associations/goa_human_isoform.gaf.gz'
-GO_HUMAN_ISOFORM_ANNOTATIONS_PATH = os.path.join(DATA_DIR, 'goa_human_isoform.gaf.gz')
+GO_HUMAN_ISOFORM_ANNOTATIONS_PATH = os.path.join(DATA_DIR, get_url_filename(GO_HUMAN_ISOFORM_ANNOTATIONS_URL))
 
 GO_HUMAN_RNA_ANNOTATIONS_URL = 'http://geneontology.org/gene-associations/goa_human_rna.gaf.gz'
-GO_HUMAN_RNA_ANNOTATIONS_PATH = os.path.join(DATA_DIR, 'goa_human_rna.gaf.gz')
+GO_HUMAN_RNA_ANNOTATIONS_PATH = os.path.join(DATA_DIR, get_url_filename(GO_HUMAN_RNA_ANNOTATIONS_URL))
 
 #: GAF columns, see: http://geneontology.org/docs/go-annotation-file-gaf-format-2.1/
 GAF_COLUMNS = [

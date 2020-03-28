@@ -10,7 +10,7 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 from sqlalchemy.orm import backref, relationship
 
-from bio2bel.manager.compath import CompathPathwayMixin, CompathProteinMixin
+from bio2bel.compath import CompathPathwayMixin, CompathProteinMixin
 from pybel import BELGraph
 from pybel.dsl import Abundance, BaseEntity, BiologicalProcess, NamedComplexAbundance
 from .constants import GO_BIOLOGICAL_PROCESS, GO_CELLULAR_COMPONENT, GO_MOLECULAR_FUNCTION, MODULE_NAME
@@ -40,6 +40,7 @@ class Term(Base, CompathPathwayMixin):
     is_complex = Column(Boolean, default=False, nullable=False,
                         doc='Cache if is descendant of GO:0032991 "macromolecular complex"')
 
+    synonyms: List[Synonym]
     annotations: List[Annotation]
 
     def to_json(self) -> Mapping[str, str]:

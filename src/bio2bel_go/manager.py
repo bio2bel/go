@@ -3,22 +3,23 @@
 """Manager for Bio2BEL GO."""
 
 import logging
+import time
 from collections import defaultdict
 from typing import Iterable, List, Mapping, Optional, Set, Tuple
 
 import networkx as nx
 import pandas as pd
-import time
 from protmapper.api import hgnc_name_to_id
 from protmapper.uniprot_client import get_gene_name
+from sqlalchemy import func
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from tqdm import tqdm
 
 import pybel.dsl
-from bio2bel.manager.compath import CompathManager
+import pyobo
+from bio2bel.compath import CompathManager
 from pybel import BELGraph
 from pybel.dsl import BaseEntity
-from pyobo import get_obo_graph, get_terms_from_graph
 from .constants import BEL_NAMESPACES, MODULE_NAME
 from .models import Annotation, Base, Hierarchy, Synonym, Target, Term
 from .parser import get_goa_all_df
@@ -27,10 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_go_id(identifier: str) -> str:
-    """If a GO term does not start with the ``GO:`` prefix, add it."""
-    if not identifier.startswith('GO:'):
-        return f'GO:{identifier}'
-
+    """Remove the GO: or GO:GO: prefix from an identifier."""
+    if identifier.startswith('GO:GO:'):
+        return identifier[len('GO:GO:'):]
+    if identifier.startswith('GO:'):
+        return identifier[len('GO:'):]
     return identifier
 
 
@@ -41,7 +43,7 @@ class Manager(CompathManager):
     _base: DeclarativeMeta = Base
 
     pathway_model = Term
-    protein_model = Annotation
+    protein_model = Target
 
     namespace_model = Term
     edge_model = [Hierarchy, Annotation]
@@ -54,7 +56,7 @@ class Manager(CompathManager):
     def __init__(self, *args, **kwargs) -> None:  # noqa: D107
         super().__init__(*args, **kwargs)
 
-        self.go = get_obo_graph('go')
+        self.obo = pyobo.get('go')
         self.terms = {}
         self.name_id = {}
 
@@ -71,9 +73,10 @@ class Manager(CompathManager):
         """Get a GO entry by name."""
         return self.session.query(Term).filter(Term.name == name).one_or_none()
 
-    def is_complex(self, identifier) -> bool:
+    def is_complex(self, go_id: str) -> bool:
         """Check if a GO term is a complex."""
-        return 'GO:0032991' in nx.descendants(self.go, identifier)
+        go_id = normalize_go_id(go_id)
+        return self.obo.is_descendant(go_id, '0032991')
 
     def populate(self, path=None, force_download=False) -> None:
         """Populate the database.
@@ -81,9 +84,7 @@ class Manager(CompathManager):
         :param path: Path to the GO OBO file
         :param force_download:
         """
-        terms = get_terms_from_graph(self.go)
-
-        for term in tqdm(terms, desc='populating GO terms'):
+        for term in tqdm(self.obo, desc='populating GO terms'):
             is_complex = self.is_complex(term.identifier)
 
             term_model = self.terms[term.identifier] = Term(
@@ -99,13 +100,12 @@ class Manager(CompathManager):
             )
             self.session.add(term_model)
 
-        for term in tqdm(terms, desc='populating GO hierarchy'):
-            for parent in term.parents:
-                hierarchy = Hierarchy(
-                    subject=self.terms[term.identifier],
-                    object=self.terms[parent.identifier],
-                    relation='isA',
-                )
+        for child_go_id, parent_go_id in tqdm(self.obo.hierarchy.edges(), desc='populating GO hierarchy'):
+            hierarchy = Hierarchy(
+                subject=self.terms[child_go_id],
+                object=self.terms[parent_go_id],
+                relation='isA',
+            )
             self.session.add(hierarchy)
 
         logger.info('building annotations')
@@ -118,6 +118,7 @@ class Manager(CompathManager):
             'evidence_code',
         ]
         goa_df = get_goa_all_df()
+        goa_df['go_id'] = goa_df['go_id'].map(normalize_go_id)
 
         goa_targets_df = goa_df[['db', 'db_id', 'db_symbol', 'taxonomy_id']].drop_duplicates()
         it = tqdm(goa_targets_df.values, total=len(goa_targets_df.index), desc='populating targets')
@@ -125,7 +126,7 @@ class Manager(CompathManager):
         for db, db_id, db_symbol, taxonomy_id in it:
             hgnc_id, hgnc_symbol = None, None
             if db == 'UniProtKB':
-                hgnc_symbol = get_gene_name(db_id)
+                hgnc_symbol = get_gene_name(db_id, web_fallback=False)
                 if hgnc_symbol:
                     hgnc_id = hgnc_name_to_id.get(hgnc_symbol)
 
@@ -155,6 +156,18 @@ class Manager(CompathManager):
         logger.info('committing models')
         self.session.commit()
         logger.info('committed models in %.2f seconds', time.time() - t)
+
+    def get_pathway_size_distribution(self) -> Mapping[str, int]:
+        """Return pathway sizes."""
+        return dict(  # see https://stackoverflow.com/questions/29491114/join-and-count-in-sql-alchemy
+            self.session
+                .query(Term.identifier, func.count(Target.hgnc_id))
+                .join(Term.annotations)
+                .join(Annotation.target)
+                .group_by(Term.identifier)
+                .having(func.count(Target.hgnc_id) > 0)
+                .all()
+        )
 
     def count_terms(self) -> int:
         """Count the number of entries in GO."""

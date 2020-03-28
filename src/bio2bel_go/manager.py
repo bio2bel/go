@@ -20,6 +20,7 @@ import pyobo
 from bio2bel.compath import CompathManager
 from pybel import BELGraph
 from pybel.dsl import BaseEntity
+from pyobo.io_utils import multidict
 from .constants import BEL_NAMESPACES, MODULE_NAME
 from .models import Annotation, Base, Hierarchy, Synonym, Target, Term
 from .parser import get_goa_all_df
@@ -169,6 +170,18 @@ class Manager(CompathManager):
                 .all()
         )
 
+    def get_pathway_id_to_symbols(self) -> Mapping[str, Set[str]]:
+        """Return the set of genes in each pathway"""
+        rv = multidict(
+            self.session
+                .query(Term.identifier, Target.hgnc_id)
+                .join(Term.annotations)
+                .join(Annotation.target)
+                .filter(Target.hgnc_id.isnot(None))
+                .all()
+        )
+        return {k: set(v) for k, v in rv.items()}
+
     def count_terms(self) -> int:
         """Count the number of entries in GO."""
         return self._count_model(Term)
@@ -202,7 +215,7 @@ class Manager(CompathManager):
             annotations=self.count_annotations(),
         )
 
-    def export_gene_sets(self, use_tqdm: bool = True) -> Mapping[str, Set[str]]:
+    def get_pathway_name_to_symbols(self, use_tqdm: bool = True) -> Mapping[str, Set[str]]:
         """Return the pathway - genesets mapping."""
         self._query_pathway().all()
         rv = defaultdict(set)
